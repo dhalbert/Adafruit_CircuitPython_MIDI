@@ -25,9 +25,9 @@ __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_MIDI.git"
 class SystemExclusive(MIDIMessage):
     """System Exclusive MIDI message.
 
-    :param list manufacturer_id: The single byte or three byte
-        manufacturer's id as a list or bytearray of numbers between 0-127.
-    :param list data: The 7bit data as a list or bytearray of numbers between 0-127.
+    :param bool real_time: True if this is a real time SYSEX message, else False.
+    :param int device_id: Device ID. If not supplied use 0x7F, which means all devices should respond.
+    :param Sequence data: SYSEX data bytes.
 
     This message can only be parsed if it fits within the input buffer in :class:MIDI.
     """
@@ -37,26 +37,23 @@ class SystemExclusive(MIDIMessage):
     LENGTH = -1
     ENDSTATUS = 0xF7
 
-    def __init__(self, manufacturer_id, data):
-        self.manufacturer_id = bytes(manufacturer_id)
+    def __init__(self, *, real_time=False, device_id=0x7F, data):
+        self.real_time = real_time
         self.data = bytes(data)
         super().__init__()
 
     def __bytes__(self):
         return (
-            bytes([self._STATUS])
-            + self.manufacturer_id
+            bytes((self._STATUS,))
+            + b"\x7F" if self.real_time else b"\x7E"
             + self.data
-            + bytes([self.ENDSTATUS])
+            + bytes((self.ENDSTATUS,))
         )
 
     @classmethod
     def from_bytes(cls, msg_bytes):
-        # -1 on second arg is to avoid the ENDSTATUS which is passed
-        if msg_bytes[1] != 0:  # pylint: disable=no-else-return
-            return cls(msg_bytes[1:2], msg_bytes[2:-1])
-        else:
-            return cls(msg_bytes[1:4], msg_bytes[4:-1])
+        # -1 on last arg is to avoid the ENDSTATUS which is passed
+        return cls(msg_bytes[2] == 0x7F, msg_bytes[3], msg_bytes[4:-1])
 
 
 SystemExclusive.register_message_type()
